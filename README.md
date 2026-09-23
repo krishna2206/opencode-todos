@@ -27,8 +27,9 @@ brings the tool back with the V1 call shape and adds a compact TUI line.
 - A click on the line shows the whole list; another click folds it back.
 - Animations: a spinner while the session works, the completed item flashing green
   before the next one fades in, and `✓ 6/6 done` for a few seconds when the list ends.
-- Nothing shows when there is no list, and a finished list is not shown when a session
-  is reopened.
+- Nothing shows when there is no list. A finished list shows `✓ n/n done` briefly, then
+  hides, and is not shown when the session is reopened; it stays stored until the
+  session is deleted.
 
 ## Install
 
@@ -68,14 +69,17 @@ Set under the plugin entry's `options`:
 ## How it works
 
 - **Server** (`src/index.ts`): the `todowrite` tool, the `context` hook that restores the
-  list after a compaction, and cleanup when a session is deleted. Lists are kept in
+  list after a compaction, and cleanup: a session's list is removed when the session is
+  deleted, and a daily sweep (`src/sweep.ts`) removes lists whose session was deleted
+  while the plugin was not running. A list is only removed when opencode reports its
+  session as not found, never on another error. Lists are kept in
   opencode's own durable key-value storage (`ctx.storage`), scoped to this plugin: no
   database of its own and nothing written to your repositories.
 - **RPC** (`src/rpc.ts`): `list({ sessionID })`, and a `changed` event after every write.
   The TUI pulls the list when told it changed.
 - **TUI** (`src/tui.tsx`): the line, on the `session.composer.top` slot.
-- **Pure logic** (`src/todos.ts`, `src/view.ts`): list updates and what the line shows,
-  covered by `pnpm test`.
+- **Pure logic** (`src/todos.ts`, `src/view.ts`, `src/sweep.ts`): list updates, what the
+  line shows and the sweep, covered by `pnpm test`.
 
 ## Development
 

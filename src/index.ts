@@ -9,6 +9,7 @@ import { Plugin } from "@opencode/plugin";
 import { Schema } from "effect";
 import { TodosRpc } from "./rpc.js";
 import { createStore } from "./store.js";
+import { isNotFound, sweepOrphans } from "./sweep.js";
 import { applyWrite, isOpen, PRIORITIES, renderForModel, STATUSES, validate } from "./todos.js";
 
 const TOOL = "todowrite";
@@ -82,6 +83,17 @@ export default Plugin.define({
         text: `# Current todo list\nYour todo list for this session, as last written with ${TOOL}:\n\n${renderForModel(list)}`,
       });
     });
+
+    // Lists left behind by sessions deleted while this plugin was not running.
+    const sessionExists = async (sessionID: string) => {
+      try {
+        await ctx.session.get({ sessionID });
+        return true;
+      } catch (error) {
+        return !isNotFound(error);
+      }
+    };
+    void sweepOrphans(ctx.storage, sessionExists, Date.now()).catch(() => {});
 
     // A deleted session's list goes with it.
     const stop = new AbortController();
