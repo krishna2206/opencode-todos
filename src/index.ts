@@ -20,14 +20,21 @@ const DESCRIPTION = [
   "Keep a todo list for the current session so progress on multi-step work stays visible to the user.",
   "Use it when the work has three or more distinct steps, or the user gives several tasks; skip it for a single simple task or a pure question.",
   "Send the complete list every time: items left out are dropped. Echo each item's id to keep its identity.",
-  "Keep exactly one item in_progress while working, and mark items completed as soon as they are done.",
+  "Keep exactly one item in_progress while working.",
+  "Call it again as soon as an item is done, before starting the next one: never batch status updates at the end, the user follows the list live.",
+  "Each item is a short title of a few words; details belong in your replies.",
 ].join(" ");
+
+// Sits in the tool result, so it stays in context without touching the prompt.
+const NUDGE = `Update this list with ${TOOL} as soon as the in_progress item is done.`;
 
 const Input = Schema.Struct({
   todos: Schema.Array(
     Schema.Struct({
       id: Schema.optional(Schema.String.annotate({ description: "Id of an existing item, as returned by a previous call" })),
-      content: Schema.String.annotate({ description: "What the task is" }),
+      content: Schema.String.annotate({
+        description: "Short task title, a few words (about 60 characters at most), no list of details",
+      }),
       status: Schema.Literals(STATUSES),
       priority: Schema.optional(Schema.Literals(PRIORITIES)),
     }),
@@ -60,7 +67,7 @@ export default Plugin.define({
           await store.write(context.sessionID, next);
           await rpc.events.emit("changed", { sessionID: context.sessionID, revision: next.revision });
           return {
-            content: renderForModel(next),
+            content: isOpen(next) ? `${renderForModel(next)}\n\n${NUDGE}` : renderForModel(next),
             metadata: { revision: next.revision, total: next.todos.length },
           };
         },
